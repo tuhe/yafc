@@ -29,7 +29,7 @@ def _compile_yafc():
     # out = subprocess.run([f"cd {bat}"], check=True, shell=True)
     # print(out)
 
-def get_json_from_yafc(name=None, rerun=False, build=True):
+def get_json_from_yafc(name=None, rerun=False, build=True, factorio_mod_path="C:\\Users\\tuhe\\AppData\\Roaming\\Factorio\\mods"):
     # Extract .json code from currently loaded mods.
     if build:
         _compile_yafc()
@@ -41,6 +41,7 @@ def get_json_from_yafc(name=None, rerun=False, build=True):
     # file = "../../CommandLineToolExample/bin/Release/netcoreapp6.0/CommandLineToolExample.exe"
     file = "../../CommandLineToolExample/Build/Windows/CommandLineToolExample.exe"
     factorio_data_path = "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Factorio\\data"
+    # factorio_mod_path = "C:\\Users\\tuhe\\AppData\\Roaming\\Factorio\\mods"
 
     dname = os.path.dirname(cdir + "/"+file)
     print(dname)
@@ -52,7 +53,7 @@ def get_json_from_yafc(name=None, rerun=False, build=True):
     wdir = os.getcwd()
     os.chdir(dn)
     print(f"> Running YAFC: {cmd} in {dn}")
-    cmd = f'CommandLineToolExample.exe "{factorio_data_path}"'
+    cmd = f'CommandLineToolExample.exe "{factorio_data_path}" "{factorio_mod_path}"'
     # print(cmd)
     out = subprocess.run(cmd, capture_output=True)
     print("> Done! Decoding...")
@@ -63,7 +64,7 @@ def get_json_from_yafc(name=None, rerun=False, build=True):
     js = "\n".join(js[k+1:])
     lines = js.splitlines()
     print(f"> Obtained {len(lines)//(1000*1000)} million lines of json. First few lines of json:")
-    print("\n".join(lines[:10]))
+    print("\n".join(lines[:6]))
     print("> Decoding json..")
     js = "\n".join(lines)
     jdecode = json.loads(js)

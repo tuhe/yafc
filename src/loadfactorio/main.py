@@ -3,15 +3,26 @@ from loadfactorio.mod import Mod
 if __name__ == "__main__":
     name = "vanilla"
     run_yafc = True
+    name = "seablock"
 
     if run_yafc:
         from loadfactorio.compile_run_yafc import get_json_from_yafc
-        mod = get_json_from_yafc(name=name, build=True)
+        mod = get_json_from_yafc(name=name, build=True, factorio_mod_path="")
         mod.status()
-        mod.save_tmp(file_out="data/vanilla.pkl")
+        if len(mod.recipes)> 1000:
+            name = "seablock"
+        else:
+            name = "vanilla"
+        mod.save_tmp(file_out=f"data/{name}.pkl")
     else:
         mod = Mod(name="vanilla")
         mod.load_tmp("data/vanilla.pkl")
+    import pickle
+    with open("data/vanilla.pkl",'rb') as f:
+        d = pickle.load(f)
+    import json
+    with open("data/vanilla.json", 'w') as f:
+        json.dump(d, f, indent=3)
 
 
     load = False
