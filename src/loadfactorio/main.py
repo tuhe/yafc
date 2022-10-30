@@ -6,12 +6,13 @@ if __name__ == "__main__":
 
     if run_yafc:
         from loadfactorio.compile_run_yafc import get_json_from_yafc
-        mod = get_json_from_yafc(name=name)
+        mod = get_json_from_yafc(name=name, build=True)
         mod.status()
-        mod.save_tmp("vanilla")
+        mod.save_tmp(file_out="data/vanilla.pkl")
     else:
-        mod = Mod()
-        mod.load_tmp("vanilla")
+        mod = Mod(name="vanilla")
+        mod.load_tmp("data/vanilla.pkl")
+
 
     load = False
     mod = Mod(name, load=load)

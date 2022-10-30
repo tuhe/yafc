@@ -78,13 +78,19 @@ def load_stump(d):
 
 names = ['sciencepacks', 'technologies', 'recipes', 'goods']
 class Mod:
-    def save_tmp(self, name="mod_name"):
+    def save_tmp(self, file_out=""):
+        print( os.getcwd())
+        fout = os.path.abspath(file_out)
+        print("Writing to", fout)
+        dn = os.path.dirname(fout)
+        if not os.path.isdir(dn):
+            os.mkdir(dn)
         pp = {v: self.__dict__[v] for v in names}
-        with open(f'{name}.pkl', 'wb') as f:
+        with open(fout, 'wb') as f:
             pickle.dump(pp, f)
 
-    def load_tmp(self, name="mod_name"):
-        with open(f'{name}.pkl', 'rb') as f:
+    def load_tmp(self, file_out):
+        with open(file_out, 'rb') as f:
             pp = pickle.load(f)
         for k, i in pp.items():
             self.__dict__[k] = i

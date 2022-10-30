@@ -8,3 +8,5 @@ Build/
 *DotSettings
 *DotSettings.user
 .vs
+**/data/*.pkl
+__pycache__

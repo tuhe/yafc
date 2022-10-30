@@ -98,7 +98,9 @@ namespace YAFC.Parser
         {
             foreach (var entry in Directory.EnumerateDirectories(directory))
             {
+
                 var infoFile = Path.Combine(entry, "info.json");
+                //Console.WriteLine(infoFile);
                 if (File.Exists(infoFile))
                 {
                     progress.Report(("Initializing", entry));

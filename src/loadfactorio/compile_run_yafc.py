@@ -49,26 +49,27 @@ def get_json_from_yafc(name=None, rerun=False, build=True):
     print("Calling YAFC...")
     cmd = file + " " + factorio_data_path
     dn = os.path.dirname(file)
+    wdir = os.getcwd()
     os.chdir(dn)
     print(f"> Running YAFC: {cmd} in {dn}")
     cmd = f'CommandLineToolExample.exe "{factorio_data_path}"'
     # print(cmd)
     out = subprocess.run(cmd, capture_output=True)
-    print("> Done!")
+    print("> Done! Decoding...")
     js = out.stdout.decode("utf8")
+    print("> Done! Splitting...")
     js = js.splitlines()
     k = max([k for k, l in enumerate(js) if l.startswith(">> ")])
     js = "\n".join(js[k+1:])
-    # with open(fname, 'w') as f:
-    #     f.write(json)
     lines = js.splitlines()
-    print(f"> Obtained {len(lines)} of json. First few lines of json:")
+    print(f"> Obtained {len(lines)//(1000*1000)} million lines of json. First few lines of json:")
     print("\n".join(lines[:10]))
     print("> Decoding json..")
     js = "\n".join(lines)
     jdecode = json.loads(js)
     mod = Mod(name, yafc_json=jdecode)
     print("> Called YAFC and made mod files. ")
+    os.chdir(wdir)
     return mod
 
 if __name__ == "__main__":
