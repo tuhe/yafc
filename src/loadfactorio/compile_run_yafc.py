@@ -29,7 +29,9 @@ def _compile_yafc():
     # out = subprocess.run([f"cd {bat}"], check=True, shell=True)
     # print(out)
 
-def get_json_from_yafc(name=None, rerun=False, build=True, factorio_mod_path="C:\\Users\\tuhe\\AppData\\Roaming\\Factorio\\mods"):
+def get_json_from_yafc(name=None, rerun=False, build=True,
+                        factorio_data_path = "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Factorio\\data",
+                        factorio_mod_path="C:\\Users\\tuhe\\AppData\\Roaming\\Factorio\\mods"):
     # Extract .json code from currently loaded mods.
     if build:
         _compile_yafc()
@@ -40,7 +42,7 @@ def get_json_from_yafc(name=None, rerun=False, build=True, factorio_mod_path="C:
     #     return
     # file = "../../CommandLineToolExample/bin/Release/netcoreapp6.0/CommandLineToolExample.exe"
     file = "../../CommandLineToolExample/Build/Windows/CommandLineToolExample.exe"
-    factorio_data_path = "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Factorio\\data"
+
     # factorio_mod_path = "C:\\Users\\tuhe\\AppData\\Roaming\\Factorio\\mods"
 
     dname = os.path.dirname(cdir + "/"+file)
