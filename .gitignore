@@ -9,4 +9,5 @@ Build/
 *DotSettings.user
 .vs
 **/data/*.pkl
+**/data/*.json
 __pycache__

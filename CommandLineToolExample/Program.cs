@@ -53,6 +53,20 @@ namespace CommandLineToolExample
             {
                 factorioPath = args[0];
             }
+            string modPath = "";
+            if (args.Length <= 1)
+            {
+                // Enable this for debug.
+                //modPath = "C:\\Users\\tuhe\\AppData\\Roaming\\Factorio\\mods";
+            }
+            else
+            {
+                modPath = args[1];
+            }
+            
+            //string modPath = args[1];
+
+
             Console.WriteLine("Debug mode: " + debug + " path " + factorioPath);
             Console.WriteLine(">> initializing...");
             YafcLib.Init();
@@ -68,7 +82,7 @@ namespace CommandLineToolExample
                 // Project is irrelevant if you just need data, but you need it to perform sheet calculations
                 // Set to not render any icons
                 Console.WriteLine(">> parsing datasource...");
-                project = FactorioDataSource.Parse(factorioPath, "", "", false, new ConsoleProgressReport(), errorCollector, "en", false);
+                project = FactorioDataSource.Parse(factorioPath, modPath, "", false, new ConsoleProgressReport(), errorCollector, "en", false);
             }
             catch (Exception ex)
             {
@@ -91,7 +105,7 @@ namespace CommandLineToolExample
             {   
                 //Console.WriteLine(obj.locName);
             }
-
+            Console.WriteLine("Number of recipes found is: " + Database.recipes.all.Length);
             Console.WriteLine(">> Serializing stuff");
             /**
             var settings = new JsonSerializerSettings
@@ -127,25 +141,22 @@ namespace CommandLineToolExample
                 
 
 
-                var e_flat = tech(e);
+                var e_flat = tech(e, "recipes");
                 
                 var js = JsonSerializer.Serialize(e_flat, options);
                 //Console.WriteLine(js);
-
                 //File.WriteAllText("dumped.json", js);
-
                 //Console.WriteLine(e);
-                var a = 234;
+                break;
             }
 
             var x = new {   
-                sciencepacks = flattt(Database.allSciencePacks), 
-
-                           technologies = flattt(Database.technologies.all),
-                           recipes_and_technology = flattt(Database.recipesAndTechnologies.all),
-                           goods = flattt(Database.goods.all),
-                           items = flattt(Database.items.all),
-                            recipes = flattt(Database.recipes.all),
+                        sciencepacks = flattt(Database.allSciencePacks, "sciencepacks"), 
+                           technologies = flattt(Database.technologies.all, "technologies"),
+//                           recipes_and_technology = flattt(Database.recipesAndTechnologies.all),
+                           goods = flattt(Database.goods.all, "goods"),
+//                           items = flattt(Database.items.all),
+                            recipes = flattt(Database.recipes.all, "recipes"),
             };
             //Database.goods.all
 //            Database.items.all
@@ -159,16 +170,18 @@ namespace CommandLineToolExample
             //File.WriteAllText("dumped.json", json);
 
         }
-        public static List<object> flattt(IEnumerable<object> enm)
+        public static List<object> flattt(IEnumerable<object> enm, string name)
         {
+            Console.WriteLine("Flattening...");
+
             var sciencepacks = new List<Object>();
             foreach (var obj in enm)
             {
-                sciencepacks.Add(tech(obj));
+                sciencepacks.Add(tech(obj, name));
             }
             return sciencepacks;
         }
-        public static Object tech(object obj, int cur_level=0, int max_level=2)
+        public static Object tech(object obj, string fname, int cur_level=0, int max_level=1)
         {
             IDictionary<string, Object> dd = new Dictionary<string, Object>();    
             bool had_properties = false;
@@ -177,14 +190,16 @@ namespace CommandLineToolExample
                 .Concat(obj.GetType().GetFields().Cast<object>())
                 .ToList();
             bool simplify = cur_level >= max_level;
+
+            int next_level = cur_level + 1;
             foreach (PropertyInfo prop in obj.GetType().GetProperties())
             {
+                string fname_next = fname;
                 var type = Nullable.GetUnderlyingType(prop.PropertyType) ?? prop.PropertyType;
                 if(type == typeof(System.Type))
                 {
                     continue; // Unclear why but let's go. 
                 }
-
 
                 var v = prop.GetValue(obj, null);
                
@@ -195,9 +210,29 @@ namespace CommandLineToolExample
                 {
                     is_ingredients = true;             
                 }
+                // Expand some fields a bit extra...
+                //int next_level = 1000;
+                if ((fname == "technologies" || fname == "recipes") && prop.Name == "ingredients")
+                {
+                    simplify = false;
+                    next_level = cur_level;
+                }
+                else if (fname == "recipes" && (prop.Name == "products" || prop.Name == "technologyUnlock"))
+                {
+                    fname_next = "recipes-df";
+                    //max_level = 2;
+                                        simplify = false;
+                                        next_level = cur_level;
+                    //next_level = cur_level + 1;
+                }
+                else
+                {
+                    next_level = cur_level + 1;
+                }
+
 
                 //Console.WriteLine(cur_level + " " + simplify + " " + max_level);
-                if(cur_level > max_level && !simplify)
+                if (cur_level > max_level && !simplify)
                 {
                     Console.WriteLine("This cannot be. ");
                 }
@@ -211,7 +246,7 @@ namespace CommandLineToolExample
                         IEnumerable enumerable = v as IEnumerable;
                         foreach (var e in enumerable)
                         {
-                            var et = tech(e, cur_level + 1, max_level);
+                            var et = tech(e, fname_next, next_level, max_level);
                             if (is_ingredients) {
                                 // Console.WriteLine(obj + " " + e + " " + et);
                             }
@@ -270,7 +305,7 @@ namespace CommandLineToolExample
                     ){
                     if (!simplify)
                     {
-                        dd.Add(prop.Name, tech(v, cur_level + 1, max_level));
+                        dd.Add(prop.Name, tech(v, fname_next, next_level, max_level));
                     }
                 }               
                 else
@@ -304,7 +339,7 @@ namespace CommandLineToolExample
                 {
                     if (!simplify)
                     {
-                        dd.Add(prop.Name, tech(v, cur_level + 1, max_level));
+                        dd.Add(prop.Name, tech(v, fname, next_level, max_level));
                     }
                 }
                 had_properties = true;
