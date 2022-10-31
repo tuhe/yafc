@@ -99,23 +99,16 @@ class Mod:
 
     def __init__(self, name, load=True, yafc_json=None):
         if yafc_json is not None:
-            # if load:
-            # fname = "../../CommandLineToolExample/bin/Debug/netcoreapp6.0/dumped.json"
-            # with open(fname, 'r') as f:
-            #     info = json.load(f)
-            # stats = os.stat(fname)
-            # print(f"Loaded {stats.st_size / (1024 ** 2):.1f} mb from {fname}")
             info = yafc_json
-            # with open(name+".json") as f:
-            #     info = json.load(f)
             def lload(name):
-                # dd =
                 sp = [load_stump(d.copy()) for d in info[name]]
                 return {s['id']: s for s in sp}
 
-            # Should return a minimal representation which is still fit for our purpose.
             def standard(r):
-                return dict(locName=r['locName'])
+                if 'iconSpec' in r and len(r['iconSpec'])>0:
+                    r['icon'] = r['iconSpec'][0]['path']
+
+                return dict(locName=r.get('locName', 'no name'), locDescr=r.get('locDescr', 'no description'))
 
             def process_sciencepacks(sciencepacks):
                 ps = {}
@@ -128,6 +121,7 @@ class Mod:
                 for id, tech in technologies.items():
                     # Process this tech.
                     t = dict(id=id, prerequisites=[p['id'] for p in tech['prerequisites']],
+                             unlockRecipes=[r['typeDotName'] for r in tech['unlockRecipes']],
                              sciencepacks=[p['goods']['typeDotName'] for p in tech['ingredients'] ], **standard(tech))
                     tn[id] = t
                 return tn
@@ -137,6 +131,7 @@ class Mod:
                 for rid, res in recipes.items():
                     r = dict()
                     r['ingredients'] = {}
+                    r['enabled'] = res['enabled']
                     for i in res['ingredients']:
                         # pprint(i)
                         id = i['goods']['typeDotName']
@@ -159,10 +154,23 @@ class Mod:
             def process_goods(goods):
                 res = {}
                 for id, good in goods.items():
+                    if id == 'Item.sb-angelsore3-tool':
+                        zz = 234
+
                     res[id] = dict(locName=good['locName'], locDesc=good.get('locDescr', "no description"), isPower=good['isPower'], # fluid=good.get('fluid', None),
-                                   temperature=good.get('temperature', None))
+                                   temperature=good.get('temperature', None),
+                                   factorioType=good['factorioType'])
                 return res
 
+            def process_entities(entities):
+                res = {}
+                for id, e in entities.items():
+                    res[id] = dict(itemsToPlace=[i['typeDotName'] for i in e['itemsToPlace']],
+                                   id=e['typeDotName'],
+                                   **standard(e))
+                return res
+
+            self.entities = process_entities(lload("entities"))
             self.sciencepacks = process_sciencepacks(lload('sciencepacks'))
             self.technologies = process_technologies(lload('technologies'))
             self.recipes = process_recipes(lload('recipes'))
@@ -177,27 +185,63 @@ class Mod:
         dd['sciencepacks'] = self.sciencepacks
         print( tabulate.tabulate(dd, headers="keys"))
 
+    def get_available_c
 
+    def available_recipes(self, available_items, available_technologies):
+        # Get all recipes that appear to be prima-facia available.
+        # If a recipe has a technology requirement, it must be met.
+        rs = []
+        available_crafters = []
+
+        [r['crafters'] for r in self.recipes.values()]
+
+        for id, r in self.recipes.items():
+            # available_technologies
+            # [mod.technologies[t]['unlockedRecipes'] for t in available_technologies]
+            tok = set(r['prerequisites']).issubset(available_technologies)
+            crafters = r['crafters']
+
+            if len(crafters) == 0:
+                print("none")
+                cok = False
+                pass
+            else:
+                if len(set(crafters).intersection(available_items)):
+                    cok = True
+                else:
+                    cok = False
+            if set( r['ingredients'].keys()).issubset(available_items) and tok and cok:
+                rs.append(id)
+        return rs
+
+
+
+
+        a = 234
         pass
 
+    def items_produced_by(self, recipes):
+
+        a = 234
+        pass
+
+
     def plot_graph(self, A=None, w=None):
+        print("Plotting..")
         from pyvis.network import Network
         g = Network(directed=True, height="1000px", select_menu=False, filter_menu=False)
         A, Agoods, Ares = self.recipes2graph()
         path = "C:/Users/tuhe/Documents/snipper/docs/latex_nup.png"
         # "https://www.w3schools.com/w3css/img_lights.jpg"
-
+        if w is None:
+            w = np.ones((A.shape[1],))
         wg = (A * (A>0)) @ w
-        # wgmax = wg.max()
 
         def t(w, ls, min=1, max=20):
             ls = np.abs(ls)
             w = np.abs(w)
             return np.sqrt( (w-ls.min())/ls.max() )*(max-min) + min
-            pass
-        # def t(w, min, max):
-        #     (np.abs(w) - min)/(4)
-        #     pass
+
         j = Ares.index("Mechanics.launch.satellite")
         i = Agoods.index("Special.launch")
         i = Agoods.index("Item.space-science-pack")
@@ -214,9 +258,10 @@ class Mod:
             # for j, p in enumerate(r['products']):
             #     g.add_edge(id, p, color="blue", width=t( A[j,k], A, 1, 20) )
         I,J = A.nonzero()
-        for i, j in zip(I,J):
+        for k, (i, j) in enumerate(zip(I,J)):
             B = A * w[np.newaxis,:]
-
+            if k % 100 == 0:
+                print(k, "of", len(I))
             if A[i,j] < 0:
                 g.add_edge(Agoods[i], Ares[j], color="red", width=t(B[i,j], B, 1, 20))
             else:
@@ -231,7 +276,7 @@ class Mod:
             print(", ".join([f"{n}: {len(self.__dict__[n])}" for n in names] ))
         print_sizes()
 
-        for id, t in self.technologies.items():
+        for id, t in list(self.technologies.items()):
             if set(t['sciencepacks']).issubset(self.sciencepacks):
                 pass
             else:

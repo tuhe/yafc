@@ -57,7 +57,7 @@ namespace CommandLineToolExample
             if (args.Length <= 1)
             {
                 // Enable this for debug.
-                //modPath = "C:\\Users\\tuhe\\AppData\\Roaming\\Factorio\\mods";
+                modPath = "C:\\Users\\tuhe\\AppData\\Roaming\\Factorio\\mods";
             }
             else
             {
@@ -126,36 +126,54 @@ namespace CommandLineToolExample
                 MaxDepth = 10
             };
 
-            var sciencepacks = new List<Object>();            
-//            foreach (var obj in Database.allSciencePacks)
- //           {
-  //              sciencepacks.Add(tech(obj));   
-   //         }
+            var sciencepacks = new List<Object>();
+            //            foreach (var obj in Database.allSciencePacks)
+            //           {
+            //              sciencepacks.Add(tech(obj));   
+            //         }
+            foreach (var e in Database.entities.all)
+            {
+                Console.WriteLine("" + e);
+
+               var  z2342 = 234;
+            }
             
-            //flattt(Database.technologies.all);
-            foreach (var e in Database.recipes.all)
+            foreach (var e in Database.technologies.all)
+            {
+                Console.WriteLine("" + e);
+                var zzz = 234;
+            }
+
+               foreach (var e in Database.recipes.all)
             {
                 //var pr = ;
                 //var tp = ;
 
                 
 
-
-                var e_flat = tech(e, "recipes");
-                
-                var js = JsonSerializer.Serialize(e_flat, options);
+                //var js = JsonSerializer.Serialize(e_flat, options);
                 //Console.WriteLine(js);
                 //File.WriteAllText("dumped.json", js);
                 //Console.WriteLine(e);
                 break;
             }
+            foreach (var g in Database.goods.all)
+            {
+                if (g.typeDotName == "Item.sb-angelsore3-tool")
+                {
+                    Console.WriteLine("" + g);
+                    break;
+                }
+            }
+
 
             var x = new {   
                         sciencepacks = flattt(Database.allSciencePacks, "sciencepacks"), 
                            technologies = flattt(Database.technologies.all, "technologies"),
 //                           recipes_and_technology = flattt(Database.recipesAndTechnologies.all),
                            goods = flattt(Database.goods.all, "goods"),
-//                           items = flattt(Database.items.all),
+                //                           items = flattt(Database.items.all),
+                            entities = flattt(Database.entities.all, "entities"),
                             recipes = flattt(Database.recipes.all, "recipes"),
             };
             //Database.goods.all
