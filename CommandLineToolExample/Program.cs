@@ -70,7 +70,7 @@ namespace CommandLineToolExample
             Console.WriteLine("Debug mode: " + debug + " path " + factorioPath);
             Console.WriteLine(">> initializing...");
             YafcLib.Init();
-            //YafcLib.RegisterDefaultAnalysis(); // Register analysis to get cost, milestones, accessibility, etc information. Skip if you just need data. 
+            YafcLib.RegisterDefaultAnalysis(); // Register analysis to get cost, milestones, accessibility, etc information. Skip if you just need data. 
             
             
             var errorCollector = new ErrorCollector();
@@ -133,14 +133,14 @@ namespace CommandLineToolExample
             //         }
             foreach (var e in Database.entities.all)
             {
-                Console.WriteLine("" + e);
+              //  Console.WriteLine("" + e);
 
                var  z2342 = 234;
             }
             
             foreach (var e in Database.technologies.all)
             {
-                Console.WriteLine("" + e);
+               // Console.WriteLine("" + e);
                 var zzz = 234;
             }
 
@@ -148,18 +148,30 @@ namespace CommandLineToolExample
             {
                 //var pr = ;
                 //var tp = ;
+                if (!e.IsAccessible())
+                {
+                    Console.WriteLine(e);
+
+                }
+                if (e.typeDotName == "Recipe.algae-farm")
+                {
+                    Console.WriteLine("" + e);
+                    break;
+                }
 
                 
+
+
 
                 //var js = JsonSerializer.Serialize(e_flat, options);
                 //Console.WriteLine(js);
                 //File.WriteAllText("dumped.json", js);
                 //Console.WriteLine(e);
-                break;
+                //break;
             }
             foreach (var g in Database.goods.all)
             {
-                if (g.typeDotName == "Item.sb-angelsore3-tool")
+                if (g.typeDotName == "Item.used-up-thorium-fuel-cell")
                 {
                     Console.WriteLine("" + g);
                     break;
@@ -170,7 +182,7 @@ namespace CommandLineToolExample
             var x = new {   
                         sciencepacks = flattt(Database.allSciencePacks, "sciencepacks"), 
                            technologies = flattt(Database.technologies.all, "technologies"),
-//                           recipes_and_technology = flattt(Database.recipesAndTechnologies.all),
+                           recipes_and_technology = flattt(Database.recipesAndTechnologies.all, "rt"),
                            goods = flattt(Database.goods.all, "goods"),
                 //                           items = flattt(Database.items.all),
                             entities = flattt(Database.entities.all, "entities"),

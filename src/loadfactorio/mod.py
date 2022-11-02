@@ -76,7 +76,7 @@ def load_stump(d):
     return dd
 
 
-names = ['sciencepacks', 'technologies', 'recipes', 'goods']
+names = ['sciencepacks', 'technologies', 'recipes', 'goods', 'entities']
 class Mod:
     def save_tmp(self, file_out=""):
         print( os.getcwd())
@@ -95,6 +95,79 @@ class Mod:
         for k, i in pp.items():
             self.__dict__[k] = i
         self.status()
+
+    @property
+    def _all_sciencepack_like_items(self):
+        return set.union(*[set(t['sciencepacks']) for t in self.technologies.values()])
+
+    def eliminate_special_goods(self):
+        """ Eleminate special goods in the mods recipes.
+
+        """
+        specials = [id for id, g in self.goods.items() if g['factorioType'] == 'special']
+        for s in specials:
+            for id, r in self.recipes.items():
+                if s in r['ingredients']:
+                    print(">> Recipe", id, "had special input", s, "as ingredient which is now eliminated")
+                    del r['ingredients'][s]
+                if s in r['products']:
+                    print(">> Recipe", id, "had special input", s, "as product which is now eliminated")
+                    del r['products'][s]
+        # return mod
+
+
+    def restrict_to_sciencepacks(self, sciencepacks=None):
+        # Perform truncation of the recipe and technology lists.
+        all_packs = self._all_sciencepack_like_items
+        if sciencepacks is None:
+            sciencepacks = all_packs
+
+        pseudo_packs = [p for p in self._all_sciencepack_like_items if 'tool' in p]
+        sciencepacks = set.union(set(pseudo_packs), set(sciencepacks))
+
+        self.eliminate_special_goods()
+        technologies_bfs = []
+        while True:
+            n = len(technologies_bfs)
+            for id, t in self.technologies.items():
+                if set(t['prerequisites']).issubset(technologies_bfs) and id not in technologies_bfs and set(
+                        t['sciencepacks']).issubset(sciencepacks):
+                    technologies_bfs.append(id)
+            if len(technologies_bfs) == n:
+                break
+        # This gives us all sciencepacks that seems producable.
+
+        recipes_disallowed = []
+        # recipes_allowed = []
+        recipes_dangling = []
+        recipes_allowed = list(set.union(*[set(t['unlockRecipes']) for id, t in self.technologies.items() if id in technologies_bfs]))
+
+        for id, r in self.recipes.items():
+            if id in recipes_allowed:
+                continue
+            pr = set(r['prerequisites'])
+            if len(pr) == 0 and not r['enabled']:
+                recipes_dangling.append(id)
+            elif pr.issubset(technologies_bfs):
+                recipes_allowed.append(id)
+            else:
+                recipes_disallowed.append(id)
+
+        # This gets us all the recipes we can actually do. Now get all items used by these recipes...
+        while True:
+            n = len(recipes_allowed)
+            recipes_allowed = [r for r in recipes_allowed if r in self.recipes]
+            all_items = self.items_produced_by(recipes_allowed) | set(pseudo_packs)
+
+            br = [r for r in recipes_allowed if not set(self.recipes[r]['ingredients']).issubset(all_items)]
+            recipes_allowed = [r for r in recipes_allowed if r not in br]
+            if n == len(recipes_allowed):
+                break
+
+        self.goods = {id: v for id, v in self.goods.items() if id in all_items}
+        self.recipes = {id : v for id, v in self.recipes.items() if id in recipes_allowed}
+        self.technologies = {id: v for id, v in self.technologies.items() if id in technologies_bfs}
+        self.entities = {id: v for id, v in self.entities.items() if len( set(v['itemsToPlace']).intersection(all_items) ) > 0}
 
 
     def __init__(self, name, load=True, yafc_json=None):
@@ -149,7 +222,11 @@ class Mod:
                         r['prerequisites'] += [tech['id'] for tech in tmp['prerequisites']]
                     r['time'] = res['time']
                     r['crafters'] = {c['typeDotName']: 'crafter' for c in res['crafters']}
+                    # r['enabled'] = res['enabled']
                     rs[rid] = r
+
+                recipes['Recipe.molten-titanium-smelting-5']
+                recipes['Recipe']
                 return rs
             def process_goods(goods):
                 res = {}
@@ -170,11 +247,13 @@ class Mod:
                                    **standard(e))
                 return res
 
+
             self.entities = process_entities(lload("entities"))
             self.sciencepacks = process_sciencepacks(lload('sciencepacks'))
             self.technologies = process_technologies(lload('technologies'))
             self.recipes = process_recipes(lload('recipes'))
             self.goods = process_goods(lload('goods'))
+            # self.rt = process_rt(lload('recipes_and_technology'))
 
     def status(self):
         # Print status of this reduced pack.
@@ -185,17 +264,29 @@ class Mod:
         dd['sciencepacks'] = self.sciencepacks
         print( tabulate.tabulate(dd, headers="keys"))
 
-    def get_available_c
 
-    def available_recipes(self, available_items, available_technologies):
+
+    def get_available_crafters(self, available_items):
+        return ['Entity.character'] + [e for e in self.entities if set(self.entities[e]['itemsToPlace']).intersection(available_items)]
+
+
+    def get_recipe_producing(self, item):
+        return [id for id, r in self.recipes.items() if item in r['products']]
+
+
+    def available_recipes(self, available_items, available_technologies, debug=False):
         # Get all recipes that appear to be prima-facia available.
         # If a recipe has a technology requirement, it must be met.
         rs = []
-        available_crafters = []
-
-        [r['crafters'] for r in self.recipes.values()]
+        available_crafters = self.get_available_crafters(available_items)
+        # [r['crafters'] for r in self.recipes.values()]
 
         for id, r in self.recipes.items():
+            if id == 'Recipe.angels-plate-steel-pre-heating' and debug:
+                print(r)
+
+
+
             # available_technologies
             # [mod.technologies[t]['unlockedRecipes'] for t in available_technologies]
             tok = set(r['prerequisites']).issubset(available_technologies)
@@ -206,27 +297,25 @@ class Mod:
                 cok = False
                 pass
             else:
-                if len(set(crafters).intersection(available_items)):
+                if len(set(crafters).intersection(available_crafters)) > 0:
                     cok = True
                 else:
                     cok = False
-            if set( r['ingredients'].keys()).issubset(available_items) and tok and cok:
+            iok = set( r['ingredients'].keys()).issubset(available_items)
+            if iok and tok and cok:
                 rs.append(id)
         return rs
 
 
-
-
-        a = 234
-        pass
-
     def items_produced_by(self, recipes):
+        l = [set(self.recipes[r]['products']) for r in recipes]
+        return set.union(*l) if len(l) > 0 else set()
 
-        a = 234
-        pass
+    def items_consumed_by(self, recipes):
+        l = [set(self.recipes[r]['ingredients']) for r in recipes]
+        return set.union(*l) if len(l) > 0 else set()
 
-
-    def plot_graph(self, A=None, w=None):
+    def plot_graph(self, A=None, w=None, fluid_factor=0.5, mechanics_factor=0.1, file_out=None):
         print("Plotting..")
         from pyvis.network import Network
         g = Network(directed=True, height="1000px", select_menu=False, filter_menu=False)
@@ -240,15 +329,24 @@ class Mod:
         def t(w, ls, min=1, max=20):
             ls = np.abs(ls)
             w = np.abs(w)
+            return np.sqrt( w / ls.max()) * (max - min) + min
             return np.sqrt( (w-ls.min())/ls.max() )*(max-min) + min
 
-        j = Ares.index("Mechanics.launch.satellite")
-        i = Agoods.index("Special.launch")
-        i = Agoods.index("Item.space-science-pack")
+        # j = Ares.index("Mechanics.launch.satellite")
+        # i = Agoods.index("Special.launch")
+        # i = Agoods.index("Item.space-science-pack")
 
+
+        # wg_max = wg.max()
+
+        def ng_size(k):
+
+            pass
         for k, id in enumerate(self.goods):
             g.add_node(id, label=id, size=t(wg[k], wg, 3, 20) )
 
+        def nr_size(k):
+            pass
         for k, (id, r) in enumerate(self.recipes.items()):
             g.add_node(id, label=id, color="red", size=t(w[k], w, 3, 20))
 
@@ -257,19 +355,48 @@ class Mod:
 
             # for j, p in enumerate(r['products']):
             #     g.add_edge(id, p, color="blue", width=t( A[j,k], A, 1, 20) )
+
+        B = A * w[np.newaxis, :]
+        ls = np.abs(B)
+        minval = 1
+        maxval = 20
+        Bmax = np.abs(B).max()
+        Bmin = np.abs(B).min()
+
+        w = np.abs(w)
+        # return np.sqrt((w - ls.min()) / ls.max()) * (max - min) + min
+
+        def edge_width(i,j):
+            b = B[i,j]
+            w = np.abs(b)
+            if Agoods[i].startswith("Fluid."):
+                b = b * fluid_factor
+            if Ares[j].startswith("Mechanics."):
+                b = b * mechanics_factor
+
+            return np.sqrt((w - Bmin) / Bmax) * (maxval - minval) + minval
+
         I,J = A.nonzero()
         for k, (i, j) in enumerate(zip(I,J)):
             B = A * w[np.newaxis,:]
             if k % 100 == 0:
                 print(k, "of", len(I))
             if A[i,j] < 0:
-                g.add_edge(Agoods[i], Ares[j], color="red", width=t(B[i,j], B, 1, 20))
+                # t(B[i, j], B, 1, 20)
+                g.add_edge(Agoods[i], Ares[j], color="red", width=edge_width(i,j) )
             else:
                 g.add_edge(Ares[j], Agoods[i], color="blue", width=t(B[i, j], B, 1, 20))
 
         g.show_buttons(filter_=['physics'])
-        g.show("basic.html", local=False)
+        if file_out is None:
+            g.show("basic.html", local=False)
+        else:
 
+            dn = os.path.dirname(file_out)
+            if not os.path.isdir(dn):
+                os.makedirs(dn)
+            os.getcwd()
+            g.show(file_out, local=True)
 
     def trim(self):
         def print_sizes():
@@ -304,7 +431,7 @@ class Mod:
         print_sizes()
 
 
-    def recipes2graph(self, normalize=False):
+    def recipes2graph(self, normalize=False, min_time=0.1):
         # Get all elements used by recipes.
         irecipes = np.asarray(list(self.recipes.keys()))
         igoods = np.asarray(list(self.goods.keys()))
@@ -320,7 +447,7 @@ class Mod:
         # ip_reverse = {name: i for i, name in enumerate(iproducts)}
         # times = []
         for ri, r in enumerate(irecipes):
-            time = (1 + self.recipes[r]['time'])
+            time = (min_time + self.recipes[r]['time'])
             print(r, time)
             for pid, p in self.recipes[r]['products'].items():
                 j = igoods.index(pid)
@@ -341,16 +468,19 @@ class Mod:
                 A[:,ri] = 10*A[:,ri]/np.sqrt(S+1e-5)
         return A, igoods, irecipes
 
-def optimize(mod):
+def optimize(mod, production_targets =None):
     A, Agoods, Ares = mod.recipes2graph()
     use_slack = False
+    if production_targets is None:
+        raise Exception("")
+        return None
     t = np.zeros((A.shape[0],))
-    packs = mod.sciencepacks
+    # packs = mod.sciencepacks
     mining_cost =  0
     base_cost = 1
 
-    for pack in packs:
-        t[np.asarray(Agoods) == pack,] = 10
+    for pack in production_targets:
+        t[np.asarray(Agoods) == pack,] = production_targets[pack]
     M = A.shape[1]
     N = A.shape[0]
     w = cp.Variable((M,))
