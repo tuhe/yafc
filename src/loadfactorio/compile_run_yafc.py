@@ -11,7 +11,7 @@ yafcd = "../../CommandLineToolExample/bin/Release/netcoreapp6.0/"
 import scipy
 import scipy.optimize
 import cvxpy as cp
-from loadfactorio.main import Mod
+from loadfactorio.mod import Mod
 
 # bin\Debug\netcoreapp6.0
 

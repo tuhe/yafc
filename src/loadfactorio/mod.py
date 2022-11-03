@@ -10,7 +10,7 @@ import scipy
 import scipy.optimize
 import cvxpy as cp
 import tabulate
-
+import copy
 
 # bin\Debug\netcoreapp6.0
 # def get_json_from_yafc(name, rerun=False):
@@ -166,7 +166,9 @@ class Mod:
 
         self.goods = {id: v for id, v in self.goods.items() if id in all_items}
         self.recipes = {id : v for id, v in self.recipes.items() if id in recipes_allowed}
-        self.technologies = {id: v for id, v in self.technologies.items() if id in technologies_bfs}
+        # self.technologies = {id: v for id, v in self.technologies.items() if id in technologies_bfs}
+        self.technologies = {id: self.technologies[id] for id in technologies_bfs}
+
         self.entities = {id: v for id, v in self.entities.items() if len( set(v['itemsToPlace']).intersection(all_items) ) > 0}
 
 
@@ -202,7 +204,7 @@ class Mod:
             def process_recipes(recipes):
                 rs = {}
                 for rid, res in recipes.items():
-                    r = dict()
+                    r =  standard(res)
                     r['ingredients'] = {}
                     r['enabled'] = res['enabled']
                     for i in res['ingredients']:
@@ -221,12 +223,13 @@ class Mod:
                     for tmp in res['technologyUnlock']:
                         r['prerequisites'] += [tech['id'] for tech in tmp['prerequisites']]
                     r['time'] = res['time']
+
                     r['crafters'] = {c['typeDotName']: 'crafter' for c in res['crafters']}
                     # r['enabled'] = res['enabled']
                     rs[rid] = r
 
-                recipes['Recipe.molten-titanium-smelting-5']
-                recipes['Recipe']
+                # recipes['Recipe.molten-titanium-smelting-5']
+                # recipes['Recipe']
                 return rs
             def process_goods(goods):
                 res = {}
@@ -264,7 +267,53 @@ class Mod:
         dd['sciencepacks'] = self.sciencepacks
         print( tabulate.tabulate(dd, headers="keys"))
 
+    def fix_recipe_temperatures(self):
+        # troublesome_items = [mod.items_produced_by(list( mod.recipes.keys() ) ) + mod.items_consumed_by(list( mod.recipes.keys() ) ]
+        troublesome_items = [id for id, g in self.goods.items() if '@' in id]
+        troublesome_items = list(set([id.split("@")[0] for id in troublesome_items]))
+        new_recipes = {}
 
+        for ibase in troublesome_items:
+            # ibase = ii.split("@")[0]
+            # variants = []
+            produced = self.items_produced_by(list(self.recipes.keys()))
+            consumed = self.items_consumed_by(list(self.recipes.keys()))
+            # variants = [i for i in produced|consumed if i.startswith(ibase)]
+            variants_consumed = [i for i in consumed if i.startswith(ibase)]
+            variants_produced = [i for i in produced if i.startswith(ibase)]
+
+            # recipes_producing = [r for r in mod.recipes if len( [l for l in mod.recipes[r]['products'] if l.startswith(ibase) ] ) > 0]
+            recipes_consuming = [r for r in self.recipes if
+                                 len([l for l in self.recipes[r]['ingredients'] if l.startswith(ibase)]) > 0]
+
+            for r in recipes_consuming:
+                # Check which variant it consumes.
+                consumed_variants = [i for i in self.recipes[r]['ingredients'] if i in variants_consumed]
+                assert len(consumed_variants) == 1  # sanity check.
+                # now get all variants that are being produced. For each variant produced, create a new recipe which consume this variant.
+                for i_alt in variants_produced:
+                    if i_alt not in consumed_variants:
+                        # print(i_alt)
+                        # r2 = mod.recipes[r].copy()
+
+                        r2 = copy.deepcopy(self.recipes[r])
+                        mint = r2['ingredients'][consumed_variants[0]]['temperature']['min']
+                        maxt = r2['ingredients'][consumed_variants[0]]['temperature']['max']
+
+                        if mint <= float(i_alt.split("@")[-1]) <= maxt:
+                            r2['ingredients'][i_alt] = r2['ingredients'][consumed_variants[0]]
+                            del r2['ingredients'][consumed_variants[0]]
+                            r2['ingredients'][i_alt]['id'] = i_alt
+                            key = r + "_" + i_alt.split("@")[-1]
+                            new_recipes[key] = r2
+                            # new_recipes.append(.recipes[key] = r2
+                            # print("Adding ", key, "which now consumes", i_alt)
+                        else:
+                            pass
+                            # print("Incompatible.")
+        # print(len(new_recipes))
+        for k, v in new_recipes.items():
+            self.recipes[k] = v
 
     def get_available_crafters(self, available_items):
         return ['Entity.character'] + [e for e in self.entities if set(self.entities[e]['itemsToPlace']).intersection(available_items)]
@@ -272,6 +321,10 @@ class Mod:
 
     def get_recipe_producing(self, item):
         return [id for id, r in self.recipes.items() if item in r['products']]
+
+    def get_recipes_consuming(self, item):
+        return [id for id, r in self.recipes.items() if item in r['ingredients']]
+
 
 
     def available_recipes(self, available_items, available_technologies, debug=False):
@@ -315,12 +368,18 @@ class Mod:
         l = [set(self.recipes[r]['ingredients']) for r in recipes]
         return set.union(*l) if len(l) > 0 else set()
 
-    def plot_graph(self, A=None, w=None, fluid_factor=0.5, mechanics_factor=0.1, file_out=None):
-        print("Plotting..")
+    def plot_raw(self, nodes, edges):
+        # pass.
+
+        # After normalization, plot a raw graph.
+        pass
+
+    def plot_graph(self, A=None, Agoods=None, Ares=None, w=None, fluid_factor=0.5, mechanics_factor=0.1, file_out=None):
         from pyvis.network import Network
-        g = Network(directed=True, height="1000px", select_menu=False, filter_menu=False)
-        A, Agoods, Ares = self.recipes2graph()
-        path = "C:/Users/tuhe/Documents/snipper/docs/latex_nup.png"
+        g = Network(directed=True, height="1000px")
+        if A is None:
+            A, Agoods, Ares = self.recipes2graph()
+        # path = "C:/Users/tuhe/Documents/snipper/docs/latex_nup.png"
         # "https://www.w3schools.com/w3css/img_lights.jpg"
         if w is None:
             w = np.ones((A.shape[1],))
@@ -330,31 +389,18 @@ class Mod:
             ls = np.abs(ls)
             w = np.abs(w)
             return np.sqrt( w / ls.max()) * (max - min) + min
-            return np.sqrt( (w-ls.min())/ls.max() )*(max-min) + min
-
-        # j = Ares.index("Mechanics.launch.satellite")
-        # i = Agoods.index("Special.launch")
-        # i = Agoods.index("Item.space-science-pack")
-
-
-        # wg_max = wg.max()
 
         def ng_size(k):
-
             pass
-        for k, id in enumerate(self.goods):
+
+        for k, id in enumerate(list(Agoods)):
             g.add_node(id, label=id, size=t(wg[k], wg, 3, 20) )
 
         def nr_size(k):
             pass
-        for k, (id, r) in enumerate(self.recipes.items()):
+
+        for k, id in enumerate(list(Ares)):
             g.add_node(id, label=id, color="red", size=t(w[k], w, 3, 20))
-
-            # for i, p in enumerate(r['ingredients']):
-            #     g.add_edge(p, id, color="red", width=t( A[i,k], A, 1, 20) )
-
-            # for j, p in enumerate(r['products']):
-            #     g.add_edge(id, p, color="blue", width=t( A[j,k], A, 1, 20) )
 
         B = A * w[np.newaxis, :]
         ls = np.abs(B)
@@ -364,23 +410,22 @@ class Mod:
         Bmin = np.abs(B).min()
 
         w = np.abs(w)
-        # return np.sqrt((w - ls.min()) / ls.max()) * (max - min) + min
 
         def edge_width(i,j):
             b = B[i,j]
             w = np.abs(b)
             if Agoods[i].startswith("Fluid."):
-                b = b * fluid_factor
+                w = w * fluid_factor
             if Ares[j].startswith("Mechanics."):
-                b = b * mechanics_factor
+                w = w * mechanics_factor
 
             return np.sqrt((w - Bmin) / Bmax) * (maxval - minval) + minval
 
         I,J = A.nonzero()
         for k, (i, j) in enumerate(zip(I,J)):
             B = A * w[np.newaxis,:]
-            if k % 100 == 0:
-                print(k, "of", len(I))
+            # if k % 100 == 0:
+            #     print(k, "of", len(I))
             if A[i,j] < 0:
                 # t(B[i, j], B, 1, 20)
                 g.add_edge(Agoods[i], Ares[j], color="red", width=edge_width(i,j) )
@@ -391,7 +436,6 @@ class Mod:
         if file_out is None:
             g.show("basic.html", local=False)
         else:
-
             dn = os.path.dirname(file_out)
             if not os.path.isdir(dn):
                 os.makedirs(dn)
@@ -448,29 +492,31 @@ class Mod:
         # times = []
         for ri, r in enumerate(irecipes):
             time = (min_time + self.recipes[r]['time'])
-            print(r, time)
+            # print(r, time)
             for pid, p in self.recipes[r]['products'].items():
                 j = igoods.index(pid)
                 A[j, ri] += p['amount']*p['probability'] / time
             for pid, p in self.recipes[r]['ingredients'].items():
+                if pid not in igoods:
+                    print("Bad!")
                 j = igoods.index(pid)
                 A[j, ri] -= p['amount'] / time
-            continue
-            time = max([.2, recipes[r]['time']])
-            for i in recipes[r]['inputs']:
-                A[ip_reverse[i], ri] -= recipes[r]['inputs'][i]['amount'] / time
-
-            for i in recipes[r]['products']:
-                A[ip_reverse[i], ri] += recipes[r]['products'][i]['amount'] * recipes[r]['products'][i]['probability'] / time
-            times.append(time)
-            if normalize:
-                S = np.abs(A[:,ri]).sum()
-                A[:,ri] = 10*A[:,ri]/np.sqrt(S+1e-5)
+            # continue
+            # time = max([.2, recipes[r]['time']])
+            # for i in recipes[r]['inputs']:
+            #     A[ip_reverse[i], ri] -= recipes[r]['inputs'][i]['amount'] / time
+            #
+            # for i in recipes[r]['products']:
+            #     A[ip_reverse[i], ri] += recipes[r]['products'][i]['amount'] * recipes[r]['products'][i]['probability'] / time
+            # times.append(time)
+            # if normalize:
+            #     S = np.abs(A[:,ri]).sum()
+            #     A[:,ri] = 10*A[:,ri]/np.sqrt(S+1e-5)
         return A, igoods, irecipes
 
-def optimize(mod, production_targets =None):
-    A, Agoods, Ares = mod.recipes2graph()
-    use_slack = False
+def optimize(mod, production_targets =None, min_time=0.01, allow_slack=True, tol=1e-5):
+    A, Agoods, Ares = mod.recipes2graph(min_time=min_time)
+    use_slack = True
     if production_targets is None:
         raise Exception("")
         return None
@@ -495,15 +541,47 @@ def optimize(mod, production_targets =None):
             c[i] = base_cost
             Imining[i] = 1
 
-    if use_slack:
-        problem = cp.Problem(cp.Minimize(cp.sum(w) + cp.sum(slack) * 100), [A @ w - slack == t, w >= 0, slack >= 0])
+    if allow_slack:
+        # problem = cp.Problem(cp.Minimize(cp.sum(w) + cp.sum(cp.abs(slack)) * 1000), [A @ w - slack == t, w >= 0])
+        problem = cp.Problem(cp.Minimize(cp.sum(w) + cp.sum(slack) * 1000), [A @ w - slack == t, w >= 0, slack >= 0])
     else:
         problem = cp.Problem(cp.Minimize(c @ w), [A @ w == t, w >= 0])
     sol = problem.solve()
-    if use_slack:
-        print("Slack variables with a non-trivial value:", [Agoods[g] for g in (slack.value > 1e-5).nonzero()[0]])
+    if sol == np.inf:
+        print("Bad solution")
+    if allow_slack:
+        print("Slack variables with a non-trivial value:", [Agoods[g] for g in ( np.abs(slack.value) > 1e-5).nonzero()[0]])
     print("Solved using the cvxpy, min(x) =", w.value.min())
     print("Solved using the cvxpy, Ax-t", np.abs(A @ w.value - t).max())
+    for k, x in enumerate(np.abs(A @ w.value - t)):
+        if x > tol:
+            print("Item", Agoods[k], "not balanced. Production mismatch by", x)
+            raise Exception
+
+    for r in mod.get_recipes_consuming('Item.raw-fish'):
+        Ares == r
+
+
     print("Total mining effort", w.value @ Imining)
-    return w.value
+    return w.value, slack.value
+
+def make_index():
+
+    import glob
+    links = []
+    for f in glob.glob("../../html/*.html"):
+        name = os.path.basename(f)
+        if name == "index.html":
+            continue
+        links.append(f"<a href='{name}'>{name}</a>")
+    links = "<br>\n".join(links)
+    html = f"""
+        <html><body>
+        <h2>Recipe-goods graphs. Size of nodes/links indicate amount produced or transported.<h2>
+        {links}
+        </body></html>
+        """
+
+    with open("../../html/index.html", 'w') as f:
+        f.write(html)
 
