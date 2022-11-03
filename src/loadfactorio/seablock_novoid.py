@@ -164,22 +164,64 @@ def plot_all():
         print(k, targets, file_out)
         if k == 6 or k == 7:
             del targets['Item.sct-bio-science-pack']
-        # if k < 18:
-        #     continue
         if k >= 25:
             continue
         cc[list(targets)[-1]] = main(void=False, sciencepacks=sciencepacks, production_targets=targets, file_out=file_out, plot=False, allow_slack=False, tol=1e-6)
-        zz = 234
-        # mod.restrict_to_sciencepacks(ordered[:k + 1])
-        # mod.status()
-        # sanity_can_produce(mod, sciencepacks + items_produce)
-        # print(p)
-    z = 234
     pass
+
+
+def utility_with_robots():
+    mod = seablock()
+    ordered = mod.packs_ordered.copy()
+    cc = {}
+    allow_targets = ['Item.automation-science-pack',
+             'Item.logistic-science-pack',
+             'Item.sct-bio-science-pack',
+             'Item.military-science-pack',
+             'Item.chemical-science-pack',
+             'Item.productivity-processor',
+             'Item.effectivity-processor',
+             'Item.speed-processor',
+             'Item.module-circuit-board',
+             'Item.module-case',
+             'Item.production-science-pack',
+             'Item.advanced-logistic-science-pack',
+             'Item.alien-science-pack',
+             'Item.utility-science-pack',
+             # 'Item.alien-science-pack-orange',
+             # 'Item.alien-science-pack-blue',
+             # 'Item.alien-science-pack-yellow',
+             # 'Item.alien-science-pack-green',
+             # 'Item.alien-science-pack-red',
+             # 'Item.alien-science-pack-purple',
+             'Item.space-science-pack']
+    legal_targets = {}
+    for p in [p for p in mod.packs_ordered if mod.sciencepack_usage[p] > 5]:
+        k = ordered.index(p)
+        sciencepacks = ordered[4:k + 1]
+        targets = {p: 1 for p in [p for p in sciencepacks if mod.sciencepack_usage[p] > 5] if p in allow_targets}
+        file_out = f"../../html/seablock_novoid_bots_{k}_{list(targets)[-1]}.html"
+        print(k, targets, file_out)
+        if k == 6 or k == 7:
+            del targets['Item.sct-bio-science-pack']
+        if k < 24:
+            continue
+
+        if k == 25:
+            break
+        targets['Item.construction-robot'] = 0.1
+        # targets['Item.sct-bio-science-pack']
+
+        cc[list(targets)[-1]] = main(void=False, sciencepacks=sciencepacks, production_targets=targets, file_out=file_out, plot=False, allow_slack=False, tol=1e-6)
+        z = 234
+    pass
+
 
 if __name__ == "__main__":
     from loadfactorio.mod import make_index
+    utility_with_robots()
     make_index()
+
     plot_all()
 
     make_index()
